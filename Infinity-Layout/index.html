@@ -303,9 +303,9 @@
             const positions = [];
             for (let i = 0; i < starCount; i++) {
                 const star = new THREE.Vector3();
-                star.x = THREE.MathUtils.randFloatSpread(2 * radius);
-                star.y = THREE.MathUtils.randFloatSpread(2 * radius);
-                star.z = THREE.MathUtils.randFloatSpread(2 * radius);
+                star.x = THREE.MathUtils.randFloatSpread(2 * Math.random(radius));
+                star.y = THREE.MathUtils.randFloatSpread(2 * Math.random(radius));
+                star.z = THREE.MathUtils.randFloatSpread(2 * Math.random(radius));
                 positions.push(star.x, star.y, star.z);
             }
             starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
