@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+        nyx4d@proton.me
+        created with threejs and chatGPT4o
+    -->
+    <title>3D Iframe Viewer with Detach Effect</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+
+        #gui {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+
+        #iframeList {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200px;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        #iframeList h2 {
+            margin-top: 0;
+        }
+
+        #iframeList div {
+            margin-bottom: 15px;
+        }
+
+        #iframeList label, #iframeList input {
+            display: block;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .iframe-div {
+            transition: all 0.3s ease;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Fullscreen focused iframe */
+        .iframe-div.focused {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+            width: 70vw;
+            height: 50vh;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Right-side GUI -->
+    <div id="gui">
+        <label>Iframe URL: <input type="text" id="iframeSrc" value="https://www.youtube.com/embed/dQw4w9WgXcQ" style="width: 100%;"></label>
+        <label>Number of Iframes: <input type="number" id="iframeCount" value="12" min="1" max="50"></label>
+        <button id="updateIframes">Update Iframes</button>
+        <button id="saveLayout">Save Layout</button>
+    </div>
+    
+    <!-- Left-side GUI for Iframe Management -->
+    <div id="iframeList">
+        <h2>Iframe List</h2>
+        <!-- Iframe index and src values will be dynamically added here -->
+    </div>
+
+    <!-- Include Three.js and OrbitControls directly -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // Basic Three.js setup
+        const scene = new THREE.Scene();
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 10, 20);
+
+        // Orbit controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Glowing central sphere
+        const glowSphereGeometry = new THREE.SphereGeometry(1, 64, 64);
+        const glowSphereMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true });
+        const glowSphere = new THREE.Mesh(glowSphereGeometry, glowSphereMaterial);
+        scene.add(glowSphere);
+
+        // Group for iframes
+        const iframeGroup = new THREE.Group();
+        scene.add(iframeGroup);
+
+        // State management
+        let focusedIframe = null;
+        let previousFocusedIframe = null;
+
+        // Starfield Background
+        createStarField(500, 20);
+
+        // Lights
+        const pointLight = new THREE.PointLight(0x00ffcc, 1, 50);
+        pointLight.position.set(0, 10, 10);
+        scene.add(pointLight);
+
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+
+        // Dynamic iframe update
+        document.getElementById('updateIframes').addEventListener('click', updateIframes);
+
+        function updateIframes() {
+            const src = document.getElementById('iframeSrc').value;
+            const count = parseInt(document.getElementById('iframeCount').value);
+
+            clearPreviousIframes();
+            createRotatingSphereLayout(src, count);
+            updateIframeList();
+        }
+
+        function createRotatingSphereLayout(src, count) {
+            const radius = 6;
+            const phiStep = Math.PI / (count / 2);
+            const thetaStep = (2 * Math.PI) / count;
+
+            for (let i = 0; i < count; i++) {
+                const phi = i * phiStep; // Vertical angle
+                const theta = i * thetaStep; // Horizontal angle
+
+                const x = radius * Math.sin(phi) * Math.cos(theta);
+                const y = radius * Math.sin(phi) * Math.sin(theta);
+                const z = radius * Math.cos(phi);
+
+                const iframePlane = createIframePlane(src, x, y, z);
+                iframeGroup.add(iframePlane);
+            }
+        }
+
+        function createIframePlane(src, x, y, z) {
+            const iframeDiv = document.createElement('div');
+            iframeDiv.classList.add('iframe-div');
+            iframeDiv.style.width = '320px';
+            iframeDiv.style.height = '180px';
+            iframeDiv.style.position = 'absolute';
+
+            const iframe = document.createElement('iframe');
+            iframe.src = src;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+
+            iframeDiv.appendChild(iframe);
+            document.body.appendChild(iframeDiv);
+
+            const geometry = new THREE.PlaneGeometry(1, 0.5625);
+            const material = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, visible: false });
+            const iframePlane = new THREE.Mesh(geometry, material);
+            iframePlane.position.set(x, y, z);
+            iframePlane.lookAt(glowSphere.position);
+
+            iframePlane.userData = { div: iframeDiv, src: src, originalPosition: new THREE.Vector3(x, y, z), originalScale: new THREE.Vector3(1, 1, 1) };
+            updateIframePosition(iframeDiv, iframePlane);
+
+            // Add click event for focusing
+            iframeDiv.addEventListener('click', () => focusIframe(iframeDiv, iframePlane));
+
+            return iframePlane;
+        }
+
+        // Function to focus on an iframe
+        function focusIframe(div, plane) {
+            // If there's already a focused iframe, return it to the rotation
+            if (focusedIframe) {
+                previousFocusedIframe = focusedIframe;
+                returnToRotation(previousFocusedIframe);
+            }
+
+            // Set the new iframe to focused
+            div.classList.add('focused');
+            focusedIframe = div;
+
+            // Pull the iframe out of rotation (detach effect)
+            plane.position.copy(new THREE.Vector3(0, 0, 10));  // Move to a new position (e.g., toward the camera)
+            plane.scale.set(2, 2, 2); // Increase the size to make it more prominent
+        }
+
+        function returnToRotation(div) {
+            div.classList.remove('focused');
+
+            const plane = iframeGroup.children.find(p => p.userData.div === div);
+            if (plane) {
+                // Smoothly animate back to original position
+                plane.position.copy(plane.userData.originalPosition);
+                plane.scale.copy(plane.userData.originalScale);
+            }
+
+            previousFocusedIframe = null;
+        }
+
+        function clearPreviousIframes() {
+            while (iframeGroup.children.length > 0) {
+                const object = iframeGroup.children[0];
+                if (object.userData.div) {
+                    document.body.removeChild(object.userData.div);
+                }
+                object.geometry.dispose();
+                object.material.dispose();
+                iframeGroup.remove(object);
+            }
+        }
+
+        function updateIframePosition(div, plane) {
+            const vector = plane.position.clone();
+            vector.project(camera);
+
+            const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+
+            div.style.left = `${x - div.offsetWidth / 2}px`;
+            div.style.top = `${y - div.offsetHeight / 2}px`;
+        }
+
+        function updateIframeList() {
+            const iframeListDiv = document.getElementById('iframeList');
+            iframeListDiv.innerHTML = '<h2>Iframe List</h2>';
+
+            iframeGroup.children.forEach((plane, index) => {
+                const iframeEntry = document.createElement('div');
+
+                const label = document.createElement('label');
+                label.textContent = `Iframe ${index + 1}`;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = plane.userData.src;
+                input.addEventListener('change', (event) => {
+                    plane.userData.src = event.target.value;
+                    plane.userData.div.querySelector('iframe').src = event.target.value;
+                });
+
+                iframeEntry.appendChild(label);
+                iframeEntry.appendChild(input);
+                iframeListDiv.appendChild(iframeEntry);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            controls.update();
+
+            // Sphere rotation for dynamic effect
+            iframeGroup.rotation.y += 0.002;
+            glowSphere.rotation.y -= 0.002;
+
+            // Dynamic scaling effect for iframe rotation (simulating particles)
+            iframeGroup.children.forEach((plane, index) => {
+                const scale = Math.abs(Math.sin(Date.now() * 0.001 + index)) * 0.5 + 0.8;
+                plane.scale.set(scale, scale, scale);
+
+                const div = plane.userData.div;
+                if (div !== focusedIframe) {
+                    updateIframePosition(div, plane);
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function createStarField(starCount, radius) {
+            const starsGeometry = new THREE.BufferGeometry();
+            const positions = [];
+            for (let i = 0; i < starCount; i++) {
+                const star = new THREE.Vector3();
+                star.x = THREE.MathUtils.randFloatSpread(2 * radius);
+                star.y = THREE.MathUtils.randFloatSpread(2 * radius);
+                star.z = THREE.MathUtils.randFloatSpread(2 * radius);
+                positions.push(star.x, star.y, star.z);
+            }
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff });
+            const starField = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(starField);
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Save and Load layout functions
+        function saveLayout() {
+            const layoutData = iframeGroup.children.map(plane => {
+                return {
+                    position: plane.position.clone(),
+                    rotation: plane.rotation.clone(),
+                    scale: plane.scale.clone(),
+                    url: plane.userData.div.querySelector('iframe').src
+                };
+            });
+            localStorage.setItem('iframeLayout', JSON.stringify(layoutData));
+            alert('Layout saved!');
+        }
+
+        document.getElementById('saveLayout').addEventListener('click', saveLayout);
+    </script>
+</body>
+</html>
