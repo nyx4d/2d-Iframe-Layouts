@@ -127,7 +127,7 @@
         let previousFocusedIframe = null;
 
         // Starfield Background
-        createStarField(500, 20);
+        //createStarField(500, 20);
 
         // Lights
         const pointLight = new THREE.PointLight(0x00ffcc, 1, 50);
@@ -298,7 +298,7 @@
             renderer.render(scene, camera);
         }
 
-        function createStarField(starCount, radius) {
+       /* function createStarField(starCount, radius) {
             const starsGeometry = new THREE.BufferGeometry();
             const positions = [];
             for (let i = 0; i < starCount; i++) {
@@ -312,7 +312,7 @@
             const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff });
             const starField = new THREE.Points(starsGeometry, starsMaterial);
             scene.add(starField);
-        }
+        }*/
 
         animate();
 
